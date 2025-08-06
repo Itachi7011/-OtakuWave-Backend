@@ -130,6 +130,14 @@ const AnimeSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
+    createdBy: {
+        userName: {
+            type: String,
+        },
+        email: {
+            type: String,
+        }
+    },
     updatedAt: {
         type: Date,
         default: Date.now
