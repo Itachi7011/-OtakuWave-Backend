@@ -347,6 +347,7 @@ app.post("/api/newUserRegistration", NewUserRegistrationMulter, async (req, res)
     const newUser = new UsersDB({
       username: username,
       email: email,
+      gender: gender,
       password: password, // Will be hashed by the pre-save middleware
       avatar: avatarUrl,
       role: "user",
@@ -578,7 +579,7 @@ const validateAnimeData = (req, res, next) => {
 
 
 // Add new animesDB
-app.post("/api/addAnime", validateAnimeData,userAuthenticate, async (req, res) => {
+app.post("/api/addAnime", validateAnimeData, userAuthenticate, async (req, res) => {
   try {
     const {
       title,
@@ -710,7 +711,7 @@ app.post("/api/userLogin", async (req, res) => {
     }
     if (isMatch === true) {
       const token = await data1.generateAuthToken();
-      await UsersDB.updateOne({ _id: data1._id }, { status: "online" });
+      await UsersDB.updateOne({ _id: data1._id }, { status: "online", lastLogin: new Date() });
 
       res.cookie("cookies1", token, {
         expires: new Date(Date.now() + 2592000000),
