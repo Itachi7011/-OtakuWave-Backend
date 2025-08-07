@@ -3,6 +3,7 @@ const usersDB = require("../models/users");
 
 const customerauthenticate = async (req, res, next) => {
     try {
+                
         const token = req.cookies.cookies1;
         
         if (!token) {
@@ -19,7 +20,7 @@ const customerauthenticate = async (req, res, next) => {
         // Find user by ID and check if token exists in their tokens array
         const rootUser = await usersDB.findOne({ 
             _id: decoded._id, 
-            "tokens.token": token 
+            "tokens": token 
         });
 
 
