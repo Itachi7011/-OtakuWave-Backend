@@ -4,8 +4,8 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// News/Updates Schema
 const NewsSchema = new mongoose.Schema({
+    
     title: {
         type: String,
         required: true

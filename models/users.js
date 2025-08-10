@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// User Schema
 const UserSchema = new mongoose.Schema({
     username: {
         type: String,
@@ -22,7 +21,7 @@ const UserSchema = new mongoose.Schema({
         type: String,
         enum: ["male", "female", "other"],
     },
-    
+
     password: {
         type: String,
         required: true

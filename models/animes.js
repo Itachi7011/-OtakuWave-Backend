@@ -123,6 +123,7 @@ const AnimeSchema = new mongoose.Schema({
             ref: "User"
         }]
     }],
+
     relatedAnime: [{
         type: String
     }],
