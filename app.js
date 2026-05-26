@@ -1,8 +1,8 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const crypto = require('crypto');
+const express = require("express");
+const mongoose = require("mongoose");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const cloudinary = require("cloudinary").v2;
 const os = require("os");
@@ -16,8 +16,7 @@ const bcryptjs = require("bcryptjs");
 const cookieParser = require("cookie-parser");
 const schedule = require("node-schedule");
 
-
-
+const schedulerManager = require("./config/scheduler");
 
 // Load environment variables
 dotenv.config();
@@ -38,17 +37,13 @@ cloudinary.config({
   secure: true,
 });
 
-
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));
 
-
-
 require("./config/connection");
-
 
 const UsersDB = require("./models/users");
 const NewsDB = require("./models/news");
@@ -56,11 +51,7 @@ const AnimesDB = require("./models/animes");
 
 const userAuthenticate = require("./authenticate/customerAuthenticate");
 
-
 // Routes
-
-
-
 
 // app.post("/api/newUserRegistration",NewUserRegistrationMulter, async (req, res) => {
 //   console.log(req.body);
@@ -71,7 +62,6 @@ const userAuthenticate = require("./authenticate/customerAuthenticate");
 //     const Cpassword = req.body.cpassword;
 //     const Email = req.body.email;
 //     const PhoneNo = Number(req.body.phoneNo);
-
 
 //     // Already Used Emails
 
@@ -151,7 +141,6 @@ const userAuthenticate = require("./authenticate/customerAuthenticate");
 
 //     };
 
-
 //     function getAge(dateString) {
 //       var today = new Date();
 //       var birthDate = new Date(dateString);
@@ -186,7 +175,6 @@ const userAuthenticate = require("./authenticate/customerAuthenticate");
 
 //     let ConvertedFormSubmittedDate = intlDateObj.format(SubmittedDate);
 
-
 //     await Transport(
 //       "coolsam929@gmail.com",
 //       "Please Use This OTP To Verify Your Insta-Hooks Account",
@@ -211,7 +199,6 @@ const userAuthenticate = require("./authenticate/customerAuthenticate");
 //       dateOfFormSubmission: new Date(),
 //     });
 
-
 //     await newUserdata.save();
 
 //     console.log("Saved in Database Successfully");
@@ -223,8 +210,6 @@ const userAuthenticate = require("./authenticate/customerAuthenticate");
 
 //     // res.redirect("/EmployeeLogin");
 
-
-
 //   } catch (err) {
 //     console.log(` Error During Registering of New User --> ${err} `);
 //   }
@@ -232,10 +217,6 @@ const userAuthenticate = require("./authenticate/customerAuthenticate");
 // );
 
 // Updated registration API endpoint
-
-
-
-
 
 const uploadToCloudinaryUsers = async (file) => {
   try {
@@ -273,135 +254,141 @@ const NewUserRegistrationMulter = multer({
   },
 }).fields([{ name: "userImage", minCount: 0, maxCount: 1 }]);
 
-app.post("/api/newUserRegistration", NewUserRegistrationMulter, async (req, res) => {
-  try {
-    const username = req.body.username;
-    const email = req.body.email;
-    const password = req.body.password;
-    const confirmPassword = req.body.confirmPassword;
-    const gender = req.body.gender;
-    const defaultAvatar = req.body.defaultAvatar;
+app.post(
+  "/api/newUserRegistration",
+  NewUserRegistrationMulter,
+  async (req, res) => {
+    try {
+      const username = req.body.username;
+      const email = req.body.email;
+      const password = req.body.password;
+      const confirmPassword = req.body.confirmPassword;
+      const gender = req.body.gender;
+      const defaultAvatar = req.body.defaultAvatar;
 
-    // Check for existing users
-    const existingUser = await UsersDB.findOne({
-      $or: [
-        { email: email },
-        { username: username }
-      ]
-    });
-
-    if (existingUser) {
-      if (existingUser.email === email) {
-        return res.status(400).json({
-          message: "This email is already registered. Please use a different email or try logging in."
-        });
-      }
-      if (existingUser.username === username) {
-        return res.status(400).json({
-          message: "This username is already taken. Please choose a different username."
-        });
-      }
-    }
-
-    // Password validation
-    if (password !== confirmPassword) {
-      return res.status(400).json({
-        message: "Password and confirm password do not match."
+      // Check for existing users
+      const existingUser = await UsersDB.findOne({
+        $or: [{ email: email }, { username: username }],
       });
-    }
 
-    if (password.length < 8) {
-      return res.status(400).json({
-        message: "Password must be at least 8 characters long."
-      });
-    }
-
-    // Handle avatar upload or default avatar
-    let avatarUrl = defaultAvatar;
-
-    if (req.files && req.files.userImage && req.files.userImage[0]) {
-      try {
-        const uploadResult = await uploadToCloudinaryUsers(req.files.userImage[0].path);
-        if (uploadResult && uploadResult.secure_url) {
-          avatarUrl = uploadResult.secure_url;
+      if (existingUser) {
+        if (existingUser.email === email) {
+          return res.status(400).json({
+            message:
+              "This email is already registered. Please use a different email or try logging in.",
+          });
         }
-      } catch (uploadError) {
-        console.error("Avatar upload error:", uploadError);
-        // Continue with default avatar if upload fails
+        if (existingUser.username === username) {
+          return res.status(400).json({
+            message:
+              "This username is already taken. Please choose a different username.",
+          });
+        }
       }
-    }
 
-    // Set default avatar based on gender if none provided
-    if (!avatarUrl) {
-      const defaultAvatars = {
-        male: "https://cdn.pixabay.com/photo/2013/07/12/15/24/goaty-149860_960_720.png",
-        female: "https://cdn.pixabay.com/photo/2023/03/31/05/52/avatar-7889246_960_720.jpg",
-        other: "https://cdn.pixabay.com/photo/2023/03/31/05/52/avatar-7889246_960_720.jpg"
-      };
-      avatarUrl = defaultAvatars[gender] || defaultAvatars.other;
-    }
+      // Password validation
+      if (password !== confirmPassword) {
+        return res.status(400).json({
+          message: "Password and confirm password do not match.",
+        });
+      }
 
-    // Create new user
-    const newUser = new UsersDB({
-      username: username,
-      email: email,
-      gender: gender,
-      password: password, // Will be hashed by the pre-save middleware
-      avatar: avatarUrl,
-      role: "user",
-      isVerified: false,
-      joinDate: new Date(),
-      lastLogin: null,
-      favorites: [],
-      watchHistory: [],
-      tokens: ""
-    });
+      if (password.length < 8) {
+        return res.status(400).json({
+          message: "Password must be at least 8 characters long.",
+        });
+      }
 
-    await newUser.save();
+      // Handle avatar upload or default avatar
+      let avatarUrl = defaultAvatar;
 
-    // Generate auth token
-    const token = await newUser.generateAuthToken();
+      if (req.files && req.files.userImage && req.files.userImage[0]) {
+        try {
+          const uploadResult = await uploadToCloudinaryUsers(
+            req.files.userImage[0].path,
+          );
+          if (uploadResult && uploadResult.secure_url) {
+            avatarUrl = uploadResult.secure_url;
+          }
+        } catch (uploadError) {
+          console.error("Avatar upload error:", uploadError);
+          // Continue with default avatar if upload fails
+        }
+      }
 
-    console.log("User registered successfully:", username);
+      // Set default avatar based on gender if none provided
+      if (!avatarUrl) {
+        const defaultAvatars = {
+          male: "https://cdn.pixabay.com/photo/2013/07/12/15/24/goaty-149860_960_720.png",
+          female:
+            "https://cdn.pixabay.com/photo/2023/03/31/05/52/avatar-7889246_960_720.jpg",
+          other:
+            "https://cdn.pixabay.com/photo/2023/03/31/05/52/avatar-7889246_960_720.jpg",
+        };
+        avatarUrl = defaultAvatars[gender] || defaultAvatars.other;
+      }
 
-    res.status(201).json({
-      message: "Registration successful! Welcome to Otaku Wave!",
-      user: {
-        id: newUser._id,
-        username: newUser.username,
-        email: newUser.email,
-        avatar: newUser.avatar,
-        joinDate: newUser.joinDate,
-        role: newUser.role,
-        isVerified: newUser.isVerified
-      },
-      token: token
-    });
+      // Create new user
+      const newUser = new UsersDB({
+        username: username,
+        email: email,
+        gender: gender,
+        password: password, // Will be hashed by the pre-save middleware
+        avatar: avatarUrl,
+        role: "user",
+        isVerified: false,
+        joinDate: new Date(),
+        lastLogin: null,
+        favorites: [],
+        watchHistory: [],
+        tokens: "",
+      });
 
-  } catch (err) {
-    console.error("Registration error:", err);
+      await newUser.save();
 
-    // Handle duplicate key errors
-    if (err.code === 11000) {
-      const field = Object.keys(err.keyPattern)[0];
-      return res.status(400).json({
-        message: `This ${field} is already registered. Please use a different ${field}.`
+      // Generate auth token
+      const token = await newUser.generateAuthToken();
+
+      console.log("User registered successfully:", username);
+
+      res.status(201).json({
+        message: "Registration successful! Welcome to Otaku Wave!",
+        user: {
+          id: newUser._id,
+          username: newUser.username,
+          email: newUser.email,
+          avatar: newUser.avatar,
+          joinDate: newUser.joinDate,
+          role: newUser.role,
+          isVerified: newUser.isVerified,
+        },
+        token: token,
+      });
+    } catch (err) {
+      console.error("Registration error:", err);
+
+      // Handle duplicate key errors
+      if (err.code === 11000) {
+        const field = Object.keys(err.keyPattern)[0];
+        return res.status(400).json({
+          message: `This ${field} is already registered. Please use a different ${field}.`,
+        });
+      }
+
+      // Handle validation errors
+      if (err.name === "ValidationError") {
+        const messages = Object.values(err.errors).map((val) => val.message);
+        return res.status(400).json({
+          message: messages.join(". "),
+        });
+      }
+
+      res.status(500).json({
+        message: "Internal server error. Please try again later.",
       });
     }
-
-    // Handle validation errors
-    if (err.name === 'ValidationError') {
-      const messages = Object.values(err.errors).map(val => val.message);
-      return res.status(400).json({
-        message: messages.join('. ')
-      });
-    }
-
-    res.status(500).json({
-      message: "Internal server error. Please try again later."
-    });
-  }
-});
+  },
+);
 
 // Additional API endpoints for user management
 
@@ -409,9 +396,9 @@ app.post("/api/newUserRegistration", NewUserRegistrationMulter, async (req, res)
 app.get("/api/user/profile", authenticateToken, async (req, res) => {
   try {
     const user = await UsersDB.findById(req.user._id)
-      .select('-password -tokens')
-      .populate('favorites', 'title poster rating')
-      .populate('watchHistory.anime', 'title poster');
+      .select("-password -tokens")
+      .populate("favorites", "title poster rating")
+      .populate("watchHistory.anime", "title poster");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -425,59 +412,65 @@ app.get("/api/user/profile", authenticateToken, async (req, res) => {
 });
 
 // Update user profile
-app.put("/api/user/profile", authenticateToken, NewUserRegistrationMulter, async (req, res) => {
-  try {
-    const updates = {};
-    const allowedUpdates = ['username', 'email'];
+app.put(
+  "/api/user/profile",
+  authenticateToken,
+  NewUserRegistrationMulter,
+  async (req, res) => {
+    try {
+      const updates = {};
+      const allowedUpdates = ["username", "email"];
 
-    // Check which fields are being updated
-    allowedUpdates.forEach(field => {
-      if (req.body[field]) {
-        updates[field] = req.body[field];
-      }
-    });
-
-    // Handle avatar update
-    if (req.files && req.files.userImage && req.files.userImage[0]) {
-      try {
-        const uploadResult = await uploadToCloudinaryUsers(req.files.userImage[0].path);
-        if (uploadResult && uploadResult.secure_url) {
-          updates.avatar = uploadResult.secure_url;
+      // Check which fields are being updated
+      allowedUpdates.forEach((field) => {
+        if (req.body[field]) {
+          updates[field] = req.body[field];
         }
-      } catch (uploadError) {
-        console.error("Avatar update error:", uploadError);
-      }
-    } else if (req.body.defaultAvatar) {
-      updates.avatar = req.body.defaultAvatar;
-    }
-
-    const user = await UsersDB.findByIdAndUpdate(
-      req.user._id,
-      updates,
-      { new: true, runValidators: true }
-    ).select('-password -tokens');
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({
-      message: "Profile updated successfully",
-      user: user
-    });
-  } catch (error) {
-    console.error("Update profile error:", error);
-
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      return res.status(400).json({
-        message: `This ${field} is already taken by another usersDB.`
       });
-    }
 
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+      // Handle avatar update
+      if (req.files && req.files.userImage && req.files.userImage[0]) {
+        try {
+          const uploadResult = await uploadToCloudinaryUsers(
+            req.files.userImage[0].path,
+          );
+          if (uploadResult && uploadResult.secure_url) {
+            updates.avatar = uploadResult.secure_url;
+          }
+        } catch (uploadError) {
+          console.error("Avatar update error:", uploadError);
+        }
+      } else if (req.body.defaultAvatar) {
+        updates.avatar = req.body.defaultAvatar;
+      }
+
+      const user = await UsersDB.findByIdAndUpdate(req.user._id, updates, {
+        new: true,
+        runValidators: true,
+      }).select("-password -tokens");
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        message: "Profile updated successfully",
+        user: user,
+      });
+    } catch (error) {
+      console.error("Update profile error:", error);
+
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern)[0];
+        return res.status(400).json({
+          message: `This ${field} is already taken by another usersDB.`,
+        });
+      }
+
+      res.status(500).json({ message: "Internal server error" });
+    }
+  },
+);
 
 // Delete user account
 app.delete("/api/user/account", authenticateToken, async (req, res) => {
@@ -498,10 +491,12 @@ app.delete("/api/user/account", authenticateToken, async (req, res) => {
 // Middleware for token authentication
 async function authenticateToken(req, res, next) {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header("Authorization")?.replace("Bearer ", "");
 
     if (!token) {
-      return res.status(401).json({ message: "Access denied. No token provided." });
+      return res
+        .status(401)
+        .json({ message: "Access denied. No token provided." });
     }
 
     const decoded = jwt.verify(token, process.env.SECRET_KEY);
@@ -524,7 +519,6 @@ app.get("/api/animeList", async (req, res) => {
   try {
     const animeList = await AnimesDB.find();
     res.status(200).json(animeList);
-
   } catch (error) {
     console.error("Error fetching anime list:", error);
     res.status(500).json({ message: "Failed to fetch anime list" });
@@ -546,14 +540,13 @@ app.get("/api/anime/:id", async (req, res) => {
   }
 });
 
-
 const validateAnimeData = (req, res, next) => {
-  const requiredFields = ['title', 'description', 'posterImage', 'status'];
-  const missingFields = requiredFields.filter(field => !req.body[field]);
+  const requiredFields = ["title", "description", "posterImage", "status"];
+  const missingFields = requiredFields.filter((field) => !req.body[field]);
 
   if (missingFields.length > 0) {
     return res.status(400).json({
-      message: `Missing required fields: ${missingFields.join(', ')}`
+      message: `Missing required fields: ${missingFields.join(", ")}`,
     });
   }
 
@@ -561,12 +554,12 @@ const validateAnimeData = (req, res, next) => {
     for (const season of req.body.seasons) {
       if (!season.seasonName) {
         return res.status(400).json({
-          message: "Each season must have a seasonName"
+          message: "Each season must have a seasonName",
         });
       }
-      if (season.driveLinks && season.driveLinks.some(link => !link)) {
+      if (season.driveLinks && season.driveLinks.some((link) => !link)) {
         return res.status(400).json({
-          message: "Drive links cannot be empty"
+          message: "Drive links cannot be empty",
         });
       }
     }
@@ -575,69 +568,74 @@ const validateAnimeData = (req, res, next) => {
   next();
 };
 
-
 // Add new animesDB
-app.post("/api/addAnime", validateAnimeData, userAuthenticate, async (req, res) => {
-  try {
-    const {
-      title,
-      originalTitle,
-      description,
-      posterImage,
-      coverImage,
-      status,
-      popularity,
-      genres,
-      type,
-      seasons,
-      studios,
-      sourceMaterial,
-      durationPerEpisode,
-      ageRating,
-      relatedAnime,
+app.post(
+  "/api/addAnime",
+  validateAnimeData,
+  userAuthenticate,
+  async (req, res) => {
+    try {
+      const {
+        title,
+        originalTitle,
+        description,
+        posterImage,
+        coverImage,
+        status,
+        popularity,
+        genres,
+        type,
+        seasons,
+        studios,
+        sourceMaterial,
+        durationPerEpisode,
+        ageRating,
+        relatedAnime,
+      } = req.body;
 
-    } = req.body;
+      console.log(req.body);
 
-    console.log(req.body)
+      // Convert studios string to array if needed
+      const studiosArray =
+        typeof studios === "string"
+          ? studios.split(",").map((s) => s.trim())
+          : studios;
 
-    // Convert studios string to array if needed
-    const studiosArray = typeof studios === 'string'
-      ? studios.split(',').map(s => s.trim())
-      : studios;
+      const relatedAnimeArray =
+        typeof studios === "string"
+          ? relatedAnime.split(",").map((s) => s.trim())
+          : relatedAnime;
 
-    const relatedAnimeArray = typeof studios === 'string'
-      ? relatedAnime.split(',').map(s => s.trim())
-      : relatedAnime;
+      const newAnime = new AnimesDB({
+        title,
+        originalTitle,
+        description,
+        posterImage,
+        coverImage,
+        status,
+        popularity,
+        genres,
+        type,
+        seasons,
+        studios: studiosArray,
+        sourceMaterial,
+        durationPerEpisode,
+        ageRating,
+        relatedAnime: relatedAnimeArray,
+        createdBy: {
+          userName: req.rootUser.username,
+          email: req.rootUser.email,
+        },
+      });
 
-    const newAnime = new AnimesDB({
-      title,
-      originalTitle,
-      description,
-      posterImage,
-      coverImage,
-      status,
-      popularity,
-      genres,
-      type,
-      seasons,
-      studios: studiosArray,
-      sourceMaterial,
-      durationPerEpisode,
-      ageRating,
-      relatedAnime: relatedAnimeArray,
-      createdBy: {
-        userName: req.rootUser.username,
-        email: req.rootUser.email
-      },
-    });
-
-    const savedAnime = await newAnime.save();
-    res.status(201).json(savedAnime);
-  } catch (error) {
-    console.error("Error adding anime:", error);
-    res.status(500).json({ message: "Failed to add anime" });
-  }
-});
+      const savedAnime = await newAnime.save();
+      res.status(201).json(savedAnime);
+    } catch (error) {
+      console.error("Error adding anime:", error);
+      res.status(500).json({ message: "Failed to add anime" });
+    }
+  },
+);
 
 // Update anime
 app.put("/api/updateAnime/:id", async (req, res) => {
@@ -646,15 +644,13 @@ app.put("/api/updateAnime/:id", async (req, res) => {
     const updateData = req.body;
 
     // Convert studios string to array if needed
-    if (updateData.studios && typeof updateData.studios === 'string') {
-      updateData.studios = updateData.studios.split(',').map(s => s.trim());
+    if (updateData.studios && typeof updateData.studios === "string") {
+      updateData.studios = updateData.studios.split(",").map((s) => s.trim());
     }
 
-    const updatedAnime = await AnimesDB.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    );
+    const updatedAnime = await AnimesDB.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
 
     if (!updatedAnime) {
       return res.status(404).json({ message: "Anime not found" });
@@ -684,10 +680,7 @@ app.delete("/api/deleteAnime/:id", async (req, res) => {
   }
 });
 
-
-
 app.post("/api/userLogin", async (req, res) => {
-
   let token;
   const Email = req.body.userEmail;
   const Password = req.body.userPassword;
@@ -705,11 +698,16 @@ app.post("/api/userLogin", async (req, res) => {
     if (isMatch === false) {
       console.log("Login Failed");
 
-      return res.status(400).json({ message: `Sorry Either Username Or Password is Incorrect,` });
+      return res
+        .status(400)
+        .json({ message: `Sorry Either Username Or Password is Incorrect,` });
     }
     if (isMatch === true) {
       const token = await data1.generateAuthToken();
-      await UsersDB.updateOne({ _id: data1._id }, { status: "online", lastLogin: new Date() });
+      await UsersDB.updateOne(
+        { _id: data1._id },
+        { status: "online", lastLogin: new Date() },
+      );
 
       res.cookie("cookies1", token, {
         expires: new Date(Date.now() + 2592000000),
@@ -724,10 +722,9 @@ app.post("/api/userLogin", async (req, res) => {
         user: {
           _id: data1._id,
           email: data1.email,
-          username: data1.username
-        }
+          username: data1.username,
+        },
       });
-
     } else {
       res.send("Sorry!");
     }
@@ -735,27 +732,20 @@ app.post("/api/userLogin", async (req, res) => {
 });
 
 app.get("/api/logout", userAuthenticate, async (req, res) => {
-
   try {
-
     res.clearCookie("cookies1", { path: "/" }); // Ensure the path matches
-    console.log("id is : ", req.rootUser._id)
+    console.log("id is : ", req.rootUser._id);
 
     await UsersDB.updateOne({ _id: req.rootUser._id }, { status: "logout" });
     // io.emit("statusChanged", { userId: req.rootUser._id, status: "logout" });
     console.log("Logout Successful");
 
-
     res.status(200).send({ message: "Logout Successful" });
-
   } catch (err) {
-
     console.log(`Error During Logout - ${err}`);
 
     res.status(500).send("Error during logout");
-
   }
-
 });
 
 app.get("/api/userProfile", userAuthenticate, async (req, res) => {
@@ -767,7 +757,6 @@ app.get("/api/userProfile", userAuthenticate, async (req, res) => {
   }
 });
 
-
 app.put("/api/updateProfile", userAuthenticate, async (req, res) => {
   try {
     const { username, email, avatar } = req.body;
@@ -775,22 +764,22 @@ app.put("/api/updateProfile", userAuthenticate, async (req, res) => {
 
     // Validation
     if (!username || !email) {
-      return res.status(400).json({ message: "Username and email are required" });
+      return res
+        .status(400)
+        .json({ message: "Username and email are required" });
     }
 
     // Check if username or email already exists (excluding current user)
     const existingUser = await UsersDB.findOne({
-      $and: [
-        { _id: { $ne: userId } },
-        { $or: [{ username }, { email }] }
-      ]
+      $and: [{ _id: { $ne: userId } }, { $or: [{ username }, { email }] }],
     });
 
     if (existingUser) {
       return res.status(400).json({
-        message: existingUser.username === username
-          ? "Username already exists"
-          : "Email already exists"
+        message:
+          existingUser.username === username
+            ? "Username already exists"
+            : "Email already exists",
       });
     }
 
@@ -800,10 +789,10 @@ app.put("/api/updateProfile", userAuthenticate, async (req, res) => {
       {
         username,
         email,
-        avatar: avatar || "default-avatar.jpg"
+        avatar: avatar || "default-avatar.jpg",
       },
-      { new: true, runValidators: true }
-    ).select('-password -tokens');
+      { new: true, runValidators: true },
+    ).select("-password -tokens");
 
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
@@ -811,18 +800,16 @@ app.put("/api/updateProfile", userAuthenticate, async (req, res) => {
 
     res.status(200).json({
       message: "Profile updated successfully",
-      user: updatedUser
+      user: updatedUser,
     });
   } catch (error) {
     console.error("Error updating profile:", error);
-    if (error.name === 'ValidationError') {
+    if (error.name === "ValidationError") {
       return res.status(400).json({ message: error.message });
     }
     res.status(500).json({ message: "Server error" });
   }
 });
-
-
 
 // Add to Favorites
 app.post("/api/addFavorite", userAuthenticate, async (req, res) => {
@@ -871,7 +858,7 @@ app.delete("/api/removeFavorite", userAuthenticate, async (req, res) => {
     }
 
     // Remove from favorites
-    user.favorites = user.favorites.filter(id => id.toString() !== animeId);
+    user.favorites = user.favorites.filter((id) => id.toString() !== animeId);
     await usersDB.save();
 
     res.status(200).json({ message: "Removed from favorites successfully" });
@@ -889,7 +876,7 @@ app.post("/api/addWatchHistory", userAuthenticate, async (req, res) => {
 
     if (!animeId || !season || !episode) {
       return res.status(400).json({
-        message: "Anime ID, season, and episode are required"
+        message: "Anime ID, season, and episode are required",
       });
     }
 
@@ -900,9 +887,10 @@ app.post("/api/addWatchHistory", userAuthenticate, async (req, res) => {
 
     // Check if this episode is already in watch history
     const existingEntry = user.watchHistory.find(
-      entry => entry.anime.toString() === animeId &&
+      (entry) =>
+        entry.anime.toString() === animeId &&
         entry.season === season &&
-        entry.episode === episode
+        entry.episode === episode,
     );
 
     if (existingEntry) {
@@ -914,7 +902,7 @@ app.post("/api/addWatchHistory", userAuthenticate, async (req, res) => {
         anime: animeId,
         season: parseInt(season),
         episode: parseInt(episode),
-        watchedAt: new Date()
+        watchedAt: new Date(),
       });
     }
 
@@ -960,7 +948,7 @@ app.put("/api/updateLastLogin", userAuthenticate, async (req, res) => {
     const userId = req.userId;
 
     await UsersDB.findByIdAndUpdate(userId, {
-      lastLogin: new Date()
+      lastLogin: new Date(),
     });
 
     res.status(200).json({ message: "Last login updated" });
@@ -976,8 +964,8 @@ app.get("/api/userStats", userAuthenticate, async (req, res) => {
     const userId = req.userId;
 
     const user = await UsersDB.findById(userId)
-      .populate('favorites')
-      .populate('watchHistory.anime');
+      .populate("favorites")
+      .populate("watchHistory.anime");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -987,13 +975,17 @@ app.get("/api/userStats", userAuthenticate, async (req, res) => {
     const stats = {
       totalFavorites: user.favorites.length,
       totalWatched: user.watchHistory.length,
-      uniqueAnimeWatched: [...new Set(user.watchHistory.map(h => h.anime._id.toString()))].length,
-      joinedDaysAgo: Math.floor((new Date() - user.joinDate) / (1000 * 60 * 60 * 24)),
+      uniqueAnimeWatched: [
+        ...new Set(user.watchHistory.map((h) => h.anime._id.toString())),
+      ].length,
+      joinedDaysAgo: Math.floor(
+        (new Date() - user.joinDate) / (1000 * 60 * 60 * 24),
+      ),
       lastLoginDaysAgo: user.lastLogin
         ? Math.floor((new Date() - user.lastLogin) / (1000 * 60 * 60 * 24))
         : null,
       mostWatchedGenres: [], // You can implement this based on your anime model
-      watchingStreak: 0 // You can implement this based on watch history dates
+      watchingStreak: 0, // You can implement this based on watch history dates
     };
 
     res.status(200).json(stats);
@@ -1003,7 +995,8 @@ app.get("/api/userStats", userAuthenticate, async (req, res) => {
   }
 });
 
-
-
 // Start the server
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  schedulerManager.initialize();
+});
